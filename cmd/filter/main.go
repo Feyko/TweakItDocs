@@ -80,7 +80,8 @@ func extractFilename(obj *sjson.Object) string {
 }
 
 func isValidAssetFilename(s string) bool {
-	match, err := regexp.MatchString("^FactoryGame.*(Build|Desc|Recipe|Schematic)_.*$", s)
+	//match, err := regexp.MatchString("^FactoryGame.*(Build|Desc|Recipe|Schematic)_.*$", s)
+	match, err := regexp.MatchString("^FactoryGame.*$", s)
 	if err != nil {
 		return false
 	}

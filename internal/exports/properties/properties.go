@@ -4,25 +4,38 @@ import (
 	"TweakItDocs/internal/exports/properties/references"
 	"TweakItDocs/internal/sjsonhelp"
 	"fmt"
+	"log"
 	"strings"
 )
 
 func typeFromStrType(s string) Property {
 	var r Property
-	switch s {
-	case "ObjectProperty":
+	switch propTypeToValueType(s) {
+	case "Object":
 		r = ObjectProperty{}
-	case "TextProperty":
+	case "Text":
 		r = TextProperty{}
-	case "ArrayProperty":
+	case "Array":
 		r = ArrayProperty{}
-	case "StructProperty":
+	case "Struct":
 		r = StructProperty{}
-	case "EnumProperty", "ByteProperty", "FloatProperty", "NameProperty", "IntProperty":
+	case "Bool":
+		r = BoolProperty{}
+	case "SoftObject":
+		r = tagProperty{} // TODO: Make a custom type for this
+	case "Map":
+		r = MapProperty{}
+	case "Delegate", "MulticastInlineDelegate", "MulticastSparseDelegate":
+		r = EventProperty{}
+	case "Set":
+		r = SetProperty{}
+	case "Enum", "Byte", "Float", "Name", "Str", "FieldPath", "Interface",
+		"Int8", "Int16", "Int", "Int64",
+		"UInt16", "UInt32", "UInt64":
 		r = tagProperty{}
 	default:
-		//fmt.Printf("Could not find property type for %v. Defaulting to tag\n", s)
-		r = tagProperty{}
+		log.Fatalf("Could not find property type for %v\n", s)
+		//r = tagProperty{}
 	}
 	return r
 }
@@ -77,7 +90,25 @@ func (p tagProperty) New(f fields) Property {
 		baseProperty{
 			name:         f.name,
 			value:        f.tag,
-			propertyType: strings.TrimRight(f.propertyType, "Property"),
+			propertyType: propTypeToValueType(f.propertyType),
+		},
+	}
+}
+
+type BoolProperty struct {
+	baseProperty
+}
+
+func (o BoolProperty) New(f fields) Property {
+	value := f.tag
+	if value == nil {
+		value = f.tag_data
+	}
+	return BoolProperty{
+		baseProperty{
+			name:         f.name,
+			propertyType: "Bool",
+			value:        value.(bool),
 		},
 	}
 }
@@ -96,12 +127,25 @@ func (o TextProperty) New(f fields) Property {
 	}
 }
 
+type EventProperty struct {
+	baseProperty
+}
+
+func (o EventProperty) New(f fields) Property {
+	return EventProperty{
+		baseProperty{
+			name:         f.name,
+			propertyType: "Event",
+			value:        nil,
+		},
+	}
+}
+
 type ObjectProperty struct {
 	baseProperty
 }
 
 func (o ObjectProperty) New(f fields) Property {
-	//fmt.Println(f)
 	return ObjectProperty{
 		baseProperty{
 			name:         f.name,
@@ -111,51 +155,64 @@ func (o ObjectProperty) New(f fields) Property {
 	}
 }
 
+type SetProperty struct {
+	baseProperty
+}
+
+func (o SetProperty) New(f fields) Property {
+	innerType := f.tag_data.(string)
+	return SetProperty{
+		baseProperty{
+			name:         f.name,
+			propertyType: fmt.Sprintf("Set of %vs", propTypeToValueType(innerType)),
+			value:        nil,
+		},
+	}
+}
+
 type ArrayProperty struct {
 	baseProperty
 }
 
+// TODO Change the container properties (Array, Map, Set) to have the inner type in their value field
+
 func (o ArrayProperty) New(f fields) Property {
 	innerType := f.tag_data.(string)
 	propertyType := typeFromStrType(innerType)
+	isInnerTypeStruct := isStructProperty(propertyType)
 	values := f.tag.([]interface{})
 	out := make([]interface{}, len(values))
 	for i, v := range values {
-		var p Property
-		if _, ok := propertyType.(StructProperty); ok {
-			p = makeStructProperty(v)
-		} else {
-			p = makeAnonymousProperty(propertyType, v)
+		var tag_data interface{} = nil
+		if isInnerTypeStruct {
+			structValue := arrayStructValueToNormalStructValue(v)
+			v = structValue["tag"]
+			tag_data = structValue["tag_data"]
 		}
-		out[i] = p.Value()
+		out[i] = propertyTypeToPropertyValue(propertyType, v, tag_data)
 	}
 	return ArrayProperty{
 		baseProperty{
 			name:         f.name,
-			propertyType: fmt.Sprintf("Array of %vs", innerType),
+			propertyType: fmt.Sprintf("Array of %vs", propTypeToValueType(innerType)),
 			value:        out,
 		},
 	}
 }
 
-func makeAnonymousProperty(propertyType Property, v interface{}) Property {
+func makeAnonymousProperty(propertyType Property, tag, tag_data interface{}) Property {
 	return propertyType.New(fields{
-		name: "NONE",
-		tag:  v,
+		name:     "NONE",
+		tag:      tag,
+		tag_data: tag_data,
 	})
 }
 
-func makeStructProperty(v interface{}) Property {
-	//fmt.Println(v)
+func arrayStructValueToNormalStructValue(v interface{}) map[string]interface{} {
 	m := v.(map[string]interface{})
 	innerTagData := m["inner_tag_data"].(map[string]interface{})
 	innerTagData["tag"] = m["properties"]
-	return StructProperty{}.New(fields{
-		name:         "NONE",
-		propertyType: "Struct",
-		tag:          innerTagData,
-		tag_data:     innerTagData["tag_data"],
-	})
+	return innerTagData
 }
 
 type StructProperty struct {
@@ -163,45 +220,161 @@ type StructProperty struct {
 }
 
 func (o StructProperty) New(f fields) Property {
-	properties := make(map[string]interface{})
-	switch v := f.tag.(type) {
-	case []interface{}:
-		for _, p := range v {
-			pmap := p.(map[string]interface{})
-			propertyType := typeFromStrType(pmap["property_type"].(string))
-			property := propertyType.New(fieldsFromUnknownMap(pmap))
-			properties[property.Name()] = property.Value()
-		}
-	case map[string]interface{}:
-		properties = v
-	}
+	properties := structValueToPropertyMaps(f.tag)
 
-	structName := f.tag_data.(map[string]interface{})["type"].(string)
+	structType := ""
+	if f.tag_data != nil {
+		structType = f.tag_data.(map[string]interface{})["type"].(string)
+	}
 
 	return StructProperty{
 		baseProperty{
 			name:         f.name,
 			propertyType: "Struct",
 			value: map[string]interface{}{
-				"name":       structName,
-				"properties": properties,
+				"struct_type": structType,
+				"properties":  properties,
 			},
 		},
 	}
 }
 
+func isStructProperty(p Property) bool {
+	_, ok := p.(StructProperty)
+	return ok
+}
+
+type MapProperty struct {
+	baseProperty
+}
+
+func (o MapProperty) New(f fields) Property {
+	tag_data := f.tag_data.(map[string]interface{})
+
+	keyPropertyTypeStr := tag_data["key_type"].(string)
+	valuePropertyTypeStr := tag_data["value_type"].(string)
+	keyPropertyType := typeFromStrType(keyPropertyTypeStr)
+	valuePropertyType := typeFromStrType(valuePropertyTypeStr)
+
+	out := make([]sjsonhelp.JsonMap, 0)
+
+	var values []interface{}
+
+	if f.tag == nil {
+		goto skip // The value of a map can be nil. In that case, completely skip the value handling
+	}
+
+	values = f.tag.([]interface{})
+	for _, v := range values {
+		vMap := v.(map[string]interface{})
+
+		key := vMap["key"]
+		value := vMap["value"]
+
+		key = propertyTypeToPropertyValue(keyPropertyType, key, nil)
+		value = propertyTypeToPropertyValue(valuePropertyType, value, nil)
+
+		out = append(out, sjsonhelp.JsonMap{"key": key, "value": value})
+	}
+
+skip:
+
+	return MapProperty{
+		baseProperty{
+			name:         f.name,
+			propertyType: fmt.Sprintf("Map of %vs to %vs", propTypeToValueType(keyPropertyTypeStr), propTypeToValueType(valuePropertyTypeStr)),
+			value:        out,
+		},
+	}
+}
+
+func propertyTypeToPropertyValue(propertyType Property, value, tag_data interface{}) interface{} {
+	property := makeAnonymousProperty(propertyType, value, tag_data)
+	return property.Value()
+}
+
+func structValueToPropertyMaps(value interface{}) []sjsonhelp.JsonMap {
+	var r []sjsonhelp.JsonMap
+	switch v := value.(type) {
+	case map[string]interface{}:
+		innerValue := v["value"]
+		if innerValue == nil {
+			return make([]sjsonhelp.JsonMap, 0)
+		}
+		r = structMapToPropertyMaps(innerValue.(map[string]interface{}))
+	case []interface{}:
+		r = mapArrayOfProperties(v)
+	case nil:
+		r = make([]sjsonhelp.JsonMap, 0)
+	default:
+		log.Fatalf("Unsupported struct value format: %#v", value)
+	}
+	return r
+}
+
+func mapArrayOfProperties(properties []interface{}) []sjsonhelp.JsonMap {
+	r := make([]sjsonhelp.JsonMap, len(properties))
+	for i, p := range properties {
+		property := New(p.(map[string]interface{}))
+		r[i] = ToMap(property)
+	}
+	return r
+}
+
+func structMapToPropertyMaps(m sjsonhelp.JsonMap) []sjsonhelp.JsonMap {
+	r := make([]sjsonhelp.JsonMap, 0, len(m))
+	for k, v := range m {
+		innerType := ""
+		var value interface{}
+		switch inner := v.(type) {
+		// Have to have those two cases. Really annoying, would be nice to get rid of this
+		case sjsonhelp.JsonMap:
+			innerType = "Struct"
+			value = structMapToPropertyMaps(inner)
+		case map[string]interface{}:
+			innerType = "Struct"
+			value = structMapToPropertyMaps(inner)
+		case int, int64:
+			innerType = "Int"
+			value = inner
+		case float64:
+			innerType = "Float"
+			value = inner
+		default:
+			log.Fatalf("Unsupported value type in struct map: %#v", v)
+		}
+		r = append(r, makePropertyMap(
+			k,
+			innerType,
+			value,
+		))
+	}
+	return r
+}
+
 func New(json sjsonhelp.JsonMap) Property {
 	values := fieldsFromUnknownMap(json)
 	propertyType := typeFromStrType(values.propertyType)
-	//fmt.Println(propertyType)
 	property := propertyType.New(values)
 	return property
 }
 
 func ToMap(p Property) sjsonhelp.JsonMap {
+	return makePropertyMap(
+		p.Name(),
+		p.Type(),
+		p.Value(),
+	)
+}
+
+func makePropertyMap(name, type_ string, value interface{}) sjsonhelp.JsonMap {
 	return sjsonhelp.JsonMap{
-		"name":  p.Name(),
-		"type":  p.Type(),
-		"value": p.Value(),
+		"name":  name,
+		"type":  type_,
+		"value": value,
 	}
+}
+
+func propTypeToValueType(s string) string {
+	return strings.TrimSuffix(s, "Property")
 }

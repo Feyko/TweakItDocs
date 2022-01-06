@@ -46,5 +46,9 @@ func formatExport(export *simdjson.Object) sjsonhelp.JsonMap {
 		prop := properties.New(propMap)
 		props[i] = properties.ToMap(prop)
 	}
-	return sjsonhelp.JsonMap{"name": name, "properties": props}
+	m, err := export.Map(nil)
+	if err != nil {
+		log.Fatalf("Could not turn export into a map: %v", err)
+	}
+	return sjsonhelp.JsonMap{"name": name, "properties": props, "map": m}
 }
