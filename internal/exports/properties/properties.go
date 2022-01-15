@@ -3,7 +3,6 @@ package properties
 import (
 	"TweakItDocs/internal/exports/properties/references"
 	"TweakItDocs/internal/sjsonhelp"
-	"fmt"
 	"log"
 	"strings"
 )
@@ -21,15 +20,13 @@ func typeFromStrType(s string) Property {
 		r = StructProperty{}
 	case "Bool":
 		r = BoolProperty{}
-	case "SoftObject":
-		r = tagProperty{} // TODO: Make a custom type for this
 	case "Map":
 		r = MapProperty{}
 	case "Delegate", "MulticastInlineDelegate", "MulticastSparseDelegate":
 		r = EventProperty{}
 	case "Set":
 		r = SetProperty{}
-	case "Enum", "Byte", "Float", "Name", "Str", "FieldPath", "Interface",
+	case "Enum", "Byte", "Float", "Name", "Str", "FieldPath", "Interface", "SoftObject",
 		"Int8", "Int16", "Int", "Int64",
 		"UInt16", "UInt32", "UInt64":
 		r = tagProperty{}
@@ -141,6 +138,20 @@ func (o EventProperty) New(f fields) Property {
 	}
 }
 
+type SoftObjectProperty struct {
+	baseProperty
+}
+
+func (o SoftObjectProperty) New(f fields) Property {
+	return SoftObjectProperty{
+		baseProperty{
+			name:         f.name,
+			propertyType: "SoftObject",
+			value:        nil,
+		},
+	}
+}
+
 type ObjectProperty struct {
 	baseProperty
 }
@@ -161,11 +172,15 @@ type SetProperty struct {
 
 func (o SetProperty) New(f fields) Property {
 	innerType := f.tag_data.(string)
+	innerValueType := propTypeToValueType(innerType)
 	return SetProperty{
 		baseProperty{
 			name:         f.name,
-			propertyType: fmt.Sprintf("Set of %vs", propTypeToValueType(innerType)),
-			value:        nil,
+			propertyType: "Set",
+			value: sjsonhelp.JsonMap{
+				"inner_type": innerValueType,
+				"value":      nil,
+			},
 		},
 	}
 }
@@ -173,8 +188,6 @@ func (o SetProperty) New(f fields) Property {
 type ArrayProperty struct {
 	baseProperty
 }
-
-// TODO Change the container properties (Array, Map, Set) to have the inner type in their value field
 
 func (o ArrayProperty) New(f fields) Property {
 	innerType := f.tag_data.(string)
@@ -191,18 +204,21 @@ func (o ArrayProperty) New(f fields) Property {
 		}
 		out[i] = propertyTypeToPropertyValue(propertyType, v, tag_data)
 	}
+	value := sjsonhelp.JsonMap{
+		"inner_type": propTypeToValueType(innerType),
+		"value":      out,
+	}
 	return ArrayProperty{
 		baseProperty{
 			name:         f.name,
-			propertyType: fmt.Sprintf("Array of %vs", propTypeToValueType(innerType)),
-			value:        out,
+			propertyType: "Array",
+			value:        value,
 		},
 	}
 }
 
 func makeAnonymousProperty(propertyType Property, tag, tag_data interface{}) Property {
 	return propertyType.New(fields{
-		name:     "NONE",
 		tag:      tag,
 		tag_data: tag_data,
 	})
@@ -278,12 +294,20 @@ func (o MapProperty) New(f fields) Property {
 	}
 
 skip:
+	keyValueTypeStr := propTypeToValueType(keyPropertyTypeStr)
+	valueValueTypeStr := propTypeToValueType(valuePropertyTypeStr)
+
+	value := sjsonhelp.JsonMap{
+		"inner_type_key":   keyValueTypeStr,
+		"inner_type_value": valueValueTypeStr,
+		"value":            out,
+	}
 
 	return MapProperty{
 		baseProperty{
 			name:         f.name,
-			propertyType: fmt.Sprintf("Map of %vs to %vs", propTypeToValueType(keyPropertyTypeStr), propTypeToValueType(valuePropertyTypeStr)),
-			value:        out,
+			propertyType: "Map",
+			value:        value,
 		},
 	}
 }

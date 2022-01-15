@@ -1,20 +1,18 @@
 let data = require('./data.json')
 let filtered = require("./filtered.json")
 
-let doubled = filtered.map(e => {
-    return e.exports.map(el => {
-        return el.properties.filter(p => {
-            return p.type === "Array of Structs"
-        })
-    })
-}).flat(9999)
-// let doubled = data.map(e => {
+// let doubled = filtered.map(e => {
 //     return e.exports.map(el => {
-//         return el.data.properties.filter(p => {
-//             return isArrayOfStructs(p)
+//         return el.properties.filter(p => {
+//             return p.type === "Array of Structs"
 //         })
 //     })
 // }).flat(9999)
+let doubled = filtered.filter(e => {
+    return e.exports.filter(exp => {
+        return exp.name.startsWith("Default__")
+    }).length < 1
+})
 // let doubled = data.map(e => {
 //     return e.summary.imports.map(el => {
 //         r = []

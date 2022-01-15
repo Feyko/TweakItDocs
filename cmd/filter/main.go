@@ -16,6 +16,16 @@ import (
 var c int
 
 func main() {
+	//file, err := os.OpenFile("benchout", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	//if err != nil {
+	//	log.Fatalf("Could not open/create the benchmarking file: %v", err)
+	//}
+	//err = pprof.StartCPUProfile(file)
+	//defer pprof.StopCPUProfile()
+	//if err != nil {
+	//	log.Fatalf("Could not start CPU profiling: %v", err)
+	//}
+
 	data, err := os.ReadFile("data.json")
 	if err != nil {
 		log.Fatalf("Could not read the data: %w", err)

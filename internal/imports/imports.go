@@ -1,147 +1,97 @@
 package imports
 
 import (
-	"TweakItDocs/internal/cdo"
 	"TweakItDocs/internal/sjsonhelp"
-	"fmt"
+	"github.com/fatih/structs"
 	sjson "github.com/minio/simdjson-go"
 	"log"
 )
 
-func ExtractImports(obj *sjson.Object) []importMap {
-	return formatMultipleImports(sjsonhelp.ExtractArray(obj, "summary", "imports"))
-}
-
-func formatMultipleImports(a *sjson.Array) []importMap {
-	objects := sjsonhelp.JsonArrayToArrayOfObjects(a)
-	r := make([]importMap, len(objects))
-	for i, o := range objects {
-		r[i] = formatImport(o)
-	}
-	return r
-}
-
-func formatImport(imp *sjson.Object) importMap {
-	mdata, err := imp.Map(nil)
-	if err != nil {
-		log.Fatalf("Could not parse imp data as map: %v", err)
-	}
-	return mdata
+func ExtractImports(obj *sjson.Object) []sjsonhelp.JsonMap {
+	jsonArray := sjsonhelp.ExtractArray(obj, "summary", "imports")
+	objects := sjsonhelp.JsonArrayToArrayOfObjects(jsonArray)
+	values := arrayOfJsonObjectsToImportValues(objects)
+	values = fillPackagesOfImportValuesArray(values)
+	return mapImportValuesArray(values)
 }
 
 type importValues struct {
-	ClassName  string
-	ObjectName string
-	OuterIndex int64
+	ClassName    string `structs:"class_name"`
+	ClassPackage string `structs:"class_package"`
+	ObjectName   string `structs:"object_name"`
+	OuterIndex   int64  `structs:"outer_index"`
+
+	// Not from the pak, filled by some logic
+	Index   int    `structs:"index"`
+	Package string `structs:"package"`
 }
 
-type importMap map[string]interface{}
-
-func getParentClassFromImports(imports []importMap) string {
-	importV := importsToImportValuesSlice(imports)
-	cdos := getCDOsFromImports(importV)
-	lowest := getLowestIndexes(cdos)
-	lowest = mapImports(lowest, cdoImportToClassImport)
-	nocdos := excludeCDOsFromImports(importV)
-	if len(lowest) > 1 {
-		lowest = filterImports(lowest, func(imp importValues) bool {
-			return !inImports(nocdos, imp)
-		})
-	}
-	if len(lowest) > 1 {
-		fmt.Println("MORETHAN1")
-		return "MORETHAN1: " + fmt.Sprint(lowest)
-	}
-	if len(lowest) < 1 {
-		fmt.Println("AYO bro")
-		return "NOFOUND"
-	}
-	return cdo.ToClassName(lowest[0].ObjectName)
-}
-
-func getLowestIndexes(imports []importValues) []importValues {
-	r := make([]importValues, 0, len(imports))
-	if len(imports) == 0 {
-		return r
-	}
-	lowest := imports[0].OuterIndex
-	for _, e := range imports {
-		if e.OuterIndex < lowest {
-			lowest = e.OuterIndex
-			r = make([]importValues, 0, len(imports))
-		}
-		if e.OuterIndex == lowest {
-			r = append(r, e)
-		}
+func arrayOfJsonObjectsToImportValues(a []*sjson.Object) []importValues {
+	r := make([]importValues, len(a))
+	for i, object := range a {
+		values := jsonObjectToImportValues(object)
+		values.Index = arrayIndexToPakStyleIndex(i)
+		r[i] = values
 	}
 	return r
 }
 
-func getCDOsFromImports(imports []importValues) []importValues {
-	return filterImports(imports, func(imp importValues) bool {
-		return cdo.Is(imp.ObjectName)
-	})
+func arrayIndexToPakStyleIndex(i int) int {
+	return -i - 1
 }
 
-func excludeCDOsFromImports(imports []importValues) []importValues {
-	return filterImports(imports, func(imp importValues) bool {
-		return !cdo.Is(imp.ObjectName)
-	})
+func pakStyleIndexToArrayIndex(i int) int {
+	return arrayIndexToPakStyleIndex(i) // Logic is actually the same
 }
 
-func importsToImportValuesSlice(imports []importMap) []importValues {
-	r := make([]importValues, len(imports))
-	for i, e := range imports {
-		r[i] = importValuesFromImport(e)
+func jsonObjectToImportValues(object *sjson.Object) importValues {
+	objectMap, err := object.Map(nil)
+	if err != nil {
+		log.Fatalf("Could not turn json object into import values because could not turn a json object into a map: %v", err)
 	}
-	return r
-}
-
-func importValuesFromImport(imp importMap) importValues {
 	return importValues{
-		ClassName:  imp["class_name"].(string),
-		ObjectName: imp["object_name"].(string),
-		OuterIndex: imp["outer_index"].(int64),
+		ClassName:    objectMap["class_name"].(string),
+		ClassPackage: objectMap["class_package"].(string),
+		ObjectName:   objectMap["object_name"].(string),
+		OuterIndex:   objectMap["outer_index"].(int64),
 	}
 }
 
-func filterImports(imports []importValues, f func(imp importValues) bool) []importValues {
-	r := make([]importValues, 0, len(imports))
-
-	for _, e := range imports {
-		if f(e) {
-			r = append(r, e)
+func fillPackagesOfImportValuesArray(imports []importValues) []importValues {
+	for i, imp := range imports {
+		if imp.OuterIndex == 0 {
+			continue
 		}
+		imports[i] = fillPackageOfImportValues(imp, imports)
 	}
-
-	return r
+	return imports
 }
 
-func inImports(imports []importValues, imp importValues) bool {
-	for _, e := range imports {
-		if imp.ObjectName == e.ClassName {
-			//fmt.Printf("FOUND EQUIVALENCE:\n%v\n%v\n", e, imp)
-			return true
+func fillPackageOfImportValues(imp importValues, imports []importValues) importValues {
+	outerPackage := findPackageOfImport(imp, imports)
+	imp.Package = outerPackage.ObjectName
+	return imp
+}
+
+func findPackageOfImport(imp importValues, imports []importValues) importValues {
+	index := imp.OuterIndex
+	next := imports[pakStyleIndexToArrayIndex(int(index))]
+	for next.OuterIndex != 0 {
+		if next.ClassName == "Package" {
+			log.Fatalf("Found a package import that isn't the root: %v", next)
 		}
+		next = imports[pakStyleIndexToArrayIndex(int(next.OuterIndex))]
 	}
-
-	return false
+	if next.ClassName != "Package" {
+		log.Fatalf("Found a root import that isn't a package: %v", next)
+	}
+	return next
 }
 
-func mapImports(imports []importValues, f func(imp importValues) importValues) []importValues {
-	r := make([]importValues, len(imports))
-
-	for i, e := range imports {
-		r[i] = f(e)
+func mapImportValuesArray(imports []importValues) []sjsonhelp.JsonMap {
+	r := make([]sjsonhelp.JsonMap, len(imports))
+	for i, imp := range imports {
+		r[i] = structs.Map(imp)
 	}
-
 	return r
-}
-
-func cdoImportToClassImport(imp importValues) importValues {
-	return importValues{
-		ClassName:  "Class",
-		ObjectName: cdo.ToClassName(imp.ObjectName),
-		OuterIndex: imp.OuterIndex,
-	}
 }
