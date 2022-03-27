@@ -12,7 +12,7 @@ type Reference struct {
 func NewReference(jsonMap sjsonhelp.JsonMap) Reference {
 	objectName := "NULLREF"
 	if jsonMap["reference"] != nil {
-		objectName = jsonMap["reference"].(map[string]interface{})["object_name"].(string)
+		objectName = jsonMap["reference"].(map[string]any)["object_name"].(string)
 	}
 	return Reference{
 		Index:      jsonMap["index"].(int64),

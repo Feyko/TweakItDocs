@@ -40,8 +40,8 @@ func typeFromStrType(s string) Property {
 type fields struct {
 	name         string
 	propertyType string
-	tag          interface{}
-	tag_data     interface{}
+	tag          any
+	tag_data     any
 }
 
 func fieldsFromUnknownMap(json sjsonhelp.JsonMap) fields {
@@ -55,7 +55,7 @@ func fieldsFromUnknownMap(json sjsonhelp.JsonMap) fields {
 
 type Property interface {
 	Type() string
-	Value() interface{}
+	Value() any
 	New(fields) Property
 	Name() string
 }
@@ -63,14 +63,14 @@ type Property interface {
 type baseProperty struct {
 	name         string
 	propertyType string
-	value        interface{}
+	value        any
 }
 
 func (p baseProperty) Type() string {
 	return p.propertyType
 }
 
-func (o baseProperty) Value() interface{} {
+func (o baseProperty) Value() any {
 	return o.value
 }
 
@@ -119,7 +119,7 @@ func (o TextProperty) New(f fields) Property {
 		baseProperty{
 			name:         f.name,
 			propertyType: "Text",
-			value:        f.tag.(map[string]interface{})["source_string"],
+			value:        f.tag.(map[string]any)["source_string"],
 		},
 	}
 }
@@ -161,7 +161,7 @@ func (o ObjectProperty) New(f fields) Property {
 		baseProperty{
 			name:         f.name,
 			propertyType: "Object",
-			value:        references.NewReference(f.tag.(map[string]interface{})),
+			value:        references.NewReference(f.tag.(map[string]any)),
 		},
 	}
 }
@@ -193,10 +193,10 @@ func (o ArrayProperty) New(f fields) Property {
 	innerType := f.tag_data.(string)
 	propertyType := typeFromStrType(innerType)
 	isInnerTypeStruct := isStructProperty(propertyType)
-	values := f.tag.([]interface{})
-	out := make([]interface{}, len(values))
+	values := f.tag.([]any)
+	out := make([]any, len(values))
 	for i, v := range values {
-		var tag_data interface{} = nil
+		var tag_data any = nil
 		if isInnerTypeStruct {
 			structValue := arrayStructValueToNormalStructValue(v)
 			v = structValue["tag"]
@@ -217,16 +217,16 @@ func (o ArrayProperty) New(f fields) Property {
 	}
 }
 
-func makeAnonymousProperty(propertyType Property, tag, tag_data interface{}) Property {
+func makeAnonymousProperty(propertyType Property, tag, tag_data any) Property {
 	return propertyType.New(fields{
 		tag:      tag,
 		tag_data: tag_data,
 	})
 }
 
-func arrayStructValueToNormalStructValue(v interface{}) map[string]interface{} {
-	m := v.(map[string]interface{})
-	innerTagData := m["inner_tag_data"].(map[string]interface{})
+func arrayStructValueToNormalStructValue(v any) map[string]any {
+	m := v.(map[string]any)
+	innerTagData := m["inner_tag_data"].(map[string]any)
 	innerTagData["tag"] = m["properties"]
 	return innerTagData
 }
@@ -240,14 +240,14 @@ func (o StructProperty) New(f fields) Property {
 
 	structType := ""
 	if f.tag_data != nil {
-		structType = f.tag_data.(map[string]interface{})["type"].(string)
+		structType = f.tag_data.(map[string]any)["type"].(string)
 	}
 
 	return StructProperty{
 		baseProperty{
 			name:         f.name,
 			propertyType: "Struct",
-			value: map[string]interface{}{
+			value: map[string]any{
 				"struct_type": structType,
 				"properties":  properties,
 			},
@@ -265,7 +265,7 @@ type MapProperty struct {
 }
 
 func (o MapProperty) New(f fields) Property {
-	tag_data := f.tag_data.(map[string]interface{})
+	tag_data := f.tag_data.(map[string]any)
 
 	keyPropertyTypeStr := tag_data["key_type"].(string)
 	valuePropertyTypeStr := tag_data["value_type"].(string)
@@ -274,15 +274,15 @@ func (o MapProperty) New(f fields) Property {
 
 	out := make([]sjsonhelp.JsonMap, 0)
 
-	var values []interface{}
+	var values []any
 
 	if f.tag == nil {
 		goto skip // The value of a map can be nil. In that case, completely skip the value handling
 	}
 
-	values = f.tag.([]interface{})
+	values = f.tag.([]any)
 	for _, v := range values {
-		vMap := v.(map[string]interface{})
+		vMap := v.(map[string]any)
 
 		key := vMap["key"]
 		value := vMap["value"]
@@ -312,21 +312,21 @@ skip:
 	}
 }
 
-func propertyTypeToPropertyValue(propertyType Property, value, tag_data interface{}) interface{} {
+func propertyTypeToPropertyValue(propertyType Property, value, tag_data any) any {
 	property := makeAnonymousProperty(propertyType, value, tag_data)
 	return property.Value()
 }
 
-func structValueToPropertyMaps(value interface{}) []sjsonhelp.JsonMap {
+func structValueToPropertyMaps(value any) []sjsonhelp.JsonMap {
 	var r []sjsonhelp.JsonMap
 	switch v := value.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		innerValue := v["value"]
 		if innerValue == nil {
 			return make([]sjsonhelp.JsonMap, 0)
 		}
-		r = structMapToPropertyMaps(innerValue.(map[string]interface{}))
-	case []interface{}:
+		r = structMapToPropertyMaps(innerValue.(map[string]any))
+	case []any:
 		r = mapArrayOfProperties(v)
 	case nil:
 		r = make([]sjsonhelp.JsonMap, 0)
@@ -336,10 +336,10 @@ func structValueToPropertyMaps(value interface{}) []sjsonhelp.JsonMap {
 	return r
 }
 
-func mapArrayOfProperties(properties []interface{}) []sjsonhelp.JsonMap {
+func mapArrayOfProperties(properties []any) []sjsonhelp.JsonMap {
 	r := make([]sjsonhelp.JsonMap, len(properties))
 	for i, p := range properties {
-		property := New(p.(map[string]interface{}))
+		property := New(p.(map[string]any))
 		r[i] = ToMap(property)
 	}
 	return r
@@ -349,13 +349,13 @@ func structMapToPropertyMaps(m sjsonhelp.JsonMap) []sjsonhelp.JsonMap {
 	r := make([]sjsonhelp.JsonMap, 0, len(m))
 	for k, v := range m {
 		innerType := ""
-		var value interface{}
+		var value any
 		switch inner := v.(type) {
 		// Have to have those two cases. Really annoying, would be nice to get rid of this
 		case sjsonhelp.JsonMap:
 			innerType = "Struct"
 			value = structMapToPropertyMaps(inner)
-		case map[string]interface{}:
+		case map[string]any:
 			innerType = "Struct"
 			value = structMapToPropertyMaps(inner)
 		case int, int64:
@@ -391,7 +391,7 @@ func ToMap(p Property) sjsonhelp.JsonMap {
 	)
 }
 
-func makePropertyMap(name, type_ string, value interface{}) sjsonhelp.JsonMap {
+func makePropertyMap(name, type_ string, value any) sjsonhelp.JsonMap {
 	return sjsonhelp.JsonMap{
 		"name":  name,
 		"type":  type_,

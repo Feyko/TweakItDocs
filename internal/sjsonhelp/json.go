@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-type JsonMap map[string]interface{}
+type JsonMap map[string]any
 
 // TODO: Fix this. It may error on empty json arrays. I believe peeking first skips the first object, I don't know why.
 func JsonArrayToArrayOfObjects(a *simdjson.Array) []*simdjson.Object {

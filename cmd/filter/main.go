@@ -50,14 +50,14 @@ func main() {
 	}
 }
 
-func formatRecord(obj *sjson.Object) map[string]interface{} {
+func formatRecord(obj *sjson.Object) map[string]any {
 	f := extractFilename(obj)
 	if !isValidAssetFilename(f) {
 		return nil
 	}
 	importList := imports.ExtractImports(obj)
 	c++
-	return map[string]interface{}{
+	return map[string]any{
 		"i":        c,
 		"filename": f,
 		"exports":  exports.ExtractExports(obj),
