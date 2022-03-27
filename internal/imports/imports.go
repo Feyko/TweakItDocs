@@ -1,19 +1,8 @@
 package imports
 
 import (
-	"TweakItDocs/internal/sjsonhelp"
-	"github.com/fatih/structs"
-	sjson "github.com/minio/simdjson-go"
 	"log"
 )
-
-func ExtractImports(obj *sjson.Object) []sjsonhelp.JsonMap {
-	jsonArray := sjsonhelp.ExtractArray(obj, "summary", "imports")
-	objects := sjsonhelp.JsonArrayToArrayOfObjects(jsonArray)
-	values := arrayOfJsonObjectsToImportValues(objects)
-	values = fillPackagesOfImportValuesArray(values)
-	return mapImportValuesArray(values)
-}
 
 type importValues struct {
 	ClassName    string `structs:"class_name"`
@@ -26,35 +15,12 @@ type importValues struct {
 	Package string `structs:"package"`
 }
 
-func arrayOfJsonObjectsToImportValues(a []*sjson.Object) []importValues {
-	r := make([]importValues, len(a))
-	for i, object := range a {
-		values := jsonObjectToImportValues(object)
-		values.Index = arrayIndexToPakStyleIndex(i)
-		r[i] = values
-	}
-	return r
-}
-
 func arrayIndexToPakStyleIndex(i int) int {
 	return -i - 1
 }
 
 func pakStyleIndexToArrayIndex(i int) int {
 	return arrayIndexToPakStyleIndex(i) // Logic is actually the same
-}
-
-func jsonObjectToImportValues(object *sjson.Object) importValues {
-	objectMap, err := object.Map(nil)
-	if err != nil {
-		log.Fatalf("Could not turn json object into import values because could not turn a json object into a map: %v", err)
-	}
-	return importValues{
-		ClassName:    objectMap["class_name"].(string),
-		ClassPackage: objectMap["class_package"].(string),
-		ObjectName:   objectMap["object_name"].(string),
-		OuterIndex:   objectMap["outer_index"].(int64),
-	}
 }
 
 func fillPackagesOfImportValuesArray(imports []importValues) []importValues {
@@ -86,12 +52,4 @@ func findPackageOfImport(imp importValues, imports []importValues) importValues 
 		log.Fatalf("Found a root import that isn't a package: %v", next)
 	}
 	return next
-}
-
-func mapImportValuesArray(imports []importValues) []sjsonhelp.JsonMap {
-	r := make([]sjsonhelp.JsonMap, len(imports))
-	for i, imp := range imports {
-		r[i] = structs.Map(imp)
-	}
-	return r
 }

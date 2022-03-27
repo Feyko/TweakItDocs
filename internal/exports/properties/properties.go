@@ -2,7 +2,6 @@ package properties
 
 import (
 	"TweakItDocs/internal/exports/properties/references"
-	"TweakItDocs/internal/sjsonhelp"
 	"log"
 	"strings"
 )
@@ -44,7 +43,7 @@ type fields struct {
 	tag_data     any
 }
 
-func fieldsFromUnknownMap(json sjsonhelp.JsonMap) fields {
+func fieldsFromUnknownMap(json map[string]any) fields {
 	return fields{
 		name:         json["name"].(string),
 		propertyType: json["property_type"].(string),
@@ -177,7 +176,7 @@ func (o SetProperty) New(f fields) Property {
 		baseProperty{
 			name:         f.name,
 			propertyType: "Set",
-			value: sjsonhelp.JsonMap{
+			value: map[string]any{
 				"inner_type": innerValueType,
 				"value":      nil,
 			},
@@ -204,7 +203,7 @@ func (o ArrayProperty) New(f fields) Property {
 		}
 		out[i] = propertyTypeToPropertyValue(propertyType, v, tag_data)
 	}
-	value := sjsonhelp.JsonMap{
+	value := map[string]any{
 		"inner_type": propTypeToValueType(innerType),
 		"value":      out,
 	}
@@ -272,7 +271,7 @@ func (o MapProperty) New(f fields) Property {
 	keyPropertyType := typeFromStrType(keyPropertyTypeStr)
 	valuePropertyType := typeFromStrType(valuePropertyTypeStr)
 
-	out := make([]sjsonhelp.JsonMap, 0)
+	out := make([]map[string]any, 0)
 
 	var values []any
 
@@ -290,14 +289,14 @@ func (o MapProperty) New(f fields) Property {
 		key = propertyTypeToPropertyValue(keyPropertyType, key, nil)
 		value = propertyTypeToPropertyValue(valuePropertyType, value, nil)
 
-		out = append(out, sjsonhelp.JsonMap{"key": key, "value": value})
+		out = append(out, map[string]any{"key": key, "value": value})
 	}
 
 skip:
 	keyValueTypeStr := propTypeToValueType(keyPropertyTypeStr)
 	valueValueTypeStr := propTypeToValueType(valuePropertyTypeStr)
 
-	value := sjsonhelp.JsonMap{
+	value := map[string]any{
 		"inner_type_key":   keyValueTypeStr,
 		"inner_type_value": valueValueTypeStr,
 		"value":            out,
@@ -317,27 +316,27 @@ func propertyTypeToPropertyValue(propertyType Property, value, tag_data any) any
 	return property.Value()
 }
 
-func structValueToPropertyMaps(value any) []sjsonhelp.JsonMap {
-	var r []sjsonhelp.JsonMap
+func structValueToPropertyMaps(value any) []map[string]any {
+	var r []map[string]any
 	switch v := value.(type) {
 	case map[string]any:
 		innerValue := v["value"]
 		if innerValue == nil {
-			return make([]sjsonhelp.JsonMap, 0)
+			return make([]map[string]any, 0)
 		}
 		r = structMapToPropertyMaps(innerValue.(map[string]any))
 	case []any:
 		r = mapArrayOfProperties(v)
 	case nil:
-		r = make([]sjsonhelp.JsonMap, 0)
+		r = make([]map[string]any, 0)
 	default:
 		log.Fatalf("Unsupported struct value format: %#v", value)
 	}
 	return r
 }
 
-func mapArrayOfProperties(properties []any) []sjsonhelp.JsonMap {
-	r := make([]sjsonhelp.JsonMap, len(properties))
+func mapArrayOfProperties(properties []any) []map[string]any {
+	r := make([]map[string]any, len(properties))
 	for i, p := range properties {
 		property := New(p.(map[string]any))
 		r[i] = ToMap(property)
@@ -345,16 +344,12 @@ func mapArrayOfProperties(properties []any) []sjsonhelp.JsonMap {
 	return r
 }
 
-func structMapToPropertyMaps(m sjsonhelp.JsonMap) []sjsonhelp.JsonMap {
-	r := make([]sjsonhelp.JsonMap, 0, len(m))
+func structMapToPropertyMaps(m map[string]any) []map[string]any {
+	r := make([]map[string]any, 0, len(m))
 	for k, v := range m {
 		innerType := ""
 		var value any
 		switch inner := v.(type) {
-		// Have to have those two cases. Really annoying, would be nice to get rid of this
-		case sjsonhelp.JsonMap:
-			innerType = "Struct"
-			value = structMapToPropertyMaps(inner)
 		case map[string]any:
 			innerType = "Struct"
 			value = structMapToPropertyMaps(inner)
@@ -376,14 +371,14 @@ func structMapToPropertyMaps(m sjsonhelp.JsonMap) []sjsonhelp.JsonMap {
 	return r
 }
 
-func New(json sjsonhelp.JsonMap) Property {
+func New(json map[string]any) Property {
 	values := fieldsFromUnknownMap(json)
 	propertyType := typeFromStrType(values.propertyType)
 	property := propertyType.New(values)
 	return property
 }
 
-func ToMap(p Property) sjsonhelp.JsonMap {
+func ToMap(p Property) map[string]any {
 	return makePropertyMap(
 		p.Name(),
 		p.Type(),
@@ -391,8 +386,8 @@ func ToMap(p Property) sjsonhelp.JsonMap {
 	)
 }
 
-func makePropertyMap(name, type_ string, value any) sjsonhelp.JsonMap {
-	return sjsonhelp.JsonMap{
+func makePropertyMap(name, type_ string, value any) map[string]any {
+	return map[string]any{
 		"name":  name,
 		"type":  type_,
 		"value": value,

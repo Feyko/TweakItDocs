@@ -2,16 +2,11 @@ package main
 
 import (
 	"TweakItDocs/internal/data"
-	"TweakItDocs/internal/exports"
-	"TweakItDocs/internal/imports"
-	"TweakItDocs/internal/sjsonhelp"
 	"encoding/json"
 	"fmt"
-	sjson "github.com/minio/simdjson-go"
 	"log"
 	"os"
 	"regexp"
-	"strings"
 )
 
 var c int
@@ -48,27 +43,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not output the result to the file: %w", err)
 	}
-}
-
-func formatRecord(obj *sjson.Object) map[string]any {
-	f := extractFilename(obj)
-	if !isValidAssetFilename(f) {
-		return nil
-	}
-	importList := imports.ExtractImports(obj)
-	c++
-	return map[string]any{
-		"i":        c,
-		"filename": f,
-		"exports":  exports.ExtractExports(obj),
-		"imports":  importList,
-		//"ClassName": getParentClassFromImports(importList),
-	}
-}
-
-func extractFilename(obj *sjson.Object) string {
-	s := sjsonhelp.ExtractString(obj, "export_record", "file_name")
-	return strings.TrimRight(s, "\u0000")
 }
 
 func isValidAssetFilename(s string) bool {
