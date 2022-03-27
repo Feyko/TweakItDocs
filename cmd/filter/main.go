@@ -1,6 +1,7 @@
 package main
 
 import (
+	"TweakItDocs/internal/data"
 	"TweakItDocs/internal/exports"
 	"TweakItDocs/internal/imports"
 	"TweakItDocs/internal/sjsonhelp"
@@ -26,38 +27,19 @@ func main() {
 	//	log.Fatalf("Could not start CPU profiling: %v", err)
 	//}
 
-	data, err := os.ReadFile("data.json")
+	content, err := os.ReadFile("data.json")
 	if err != nil {
 		log.Fatalf("Could not read the data: %w", err)
 	}
 
-	parsed, err := sjson.Parse(data, nil)
-	fmt.Println("Finished parsing")
-	r := make([]interface{}, 0, 40000)
-
-	_ = parsed.ForEach(func(i sjson.Iter) error {
-		for {
-			typ := i.Advance()
-			if typ == sjson.TypeNone {
-				return nil
-			}
-
-			obj, err := i.Object(nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-			record := formatRecord(obj)
-			if record == nil {
-				continue
-			}
-			r = append(r, record)
-		}
-
-		return nil
-	})
+	extracted, err := data.Extract(content)
+	if err != nil {
+		log.Fatalf("Could not decode the data: %w\n", err)
+	}
+	fmt.Print("Finished extraction")
 
 	//marshalled, err := sjsonhelp.MarshalIndent(r, "", " ")
-	marshalled, err := json.Marshal(r)
+	marshalled, err := json.Marshal(extracted)
 	if err != nil {
 		log.Fatalf("Could not marshal json: %v", err)
 	}

@@ -8,11 +8,11 @@ let filtered = require("./filtered.json")
 //         })
 //     })
 // }).flat(9999)
-let doubled = filtered.filter(e => {
-    return e.exports.filter(exp => {
-        return exp.name.startsWith("Default__")
-    }).length < 1
-})
+// let doubled = filtered.filter(e => {
+//     return e.exports.filter(exp => {
+//         return exp.name.startsWith("Default__")
+//     }).length < 1
+// })
 // let doubled = data.map(e => {
 //     return e.summary.imports.map(el => {
 //         r = []
