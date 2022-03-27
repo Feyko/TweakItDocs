@@ -1,13 +1,35 @@
 package properties
 
 import (
-	"TweakItDocs/internal/exports/properties/references"
+	"TweakItDocs/internal/data/properties/references"
 	"log"
 	"strings"
 )
 
-func typeFromStrType(s string) Property {
-	var r Property
+type Property struct {
+	PropertyType string `json:"property_type"`
+	Name         string `json:"name"`
+	Value        any    `json:"value"`
+}
+
+type RawProperty struct {
+	Name    string `json:"name"`
+	Type    string `json:"property_type"`
+	Tag     any    `json:"tag"`
+	TagData any    `json:"tag_data"`
+}
+
+func jsonToRawProperty(json map[string]any) RawProperty {
+	return RawProperty{
+		Name:    json["name"].(string),
+		Type:    json["property_type"].(string),
+		Tag:     json["tag"],
+		TagData: json["tag_data"],
+	}
+}
+
+func typeFromStrType(s string) UnknownProperty {
+	var r UnknownProperty
 	switch propTypeToValueType(s) {
 	case "Object":
 		r = ObjectProperty{}
@@ -36,26 +58,10 @@ func typeFromStrType(s string) Property {
 	return r
 }
 
-type fields struct {
-	name         string
-	propertyType string
-	tag          any
-	tag_data     any
-}
-
-func fieldsFromUnknownMap(json map[string]any) fields {
-	return fields{
-		name:         json["name"].(string),
-		propertyType: json["property_type"].(string),
-		tag:          json["tag"],
-		tag_data:     json["tag_data"],
-	}
-}
-
-type Property interface {
+type UnknownProperty interface {
 	Type() string
 	Value() any
-	New(fields) Property
+	New(RawProperty) UnknownProperty
 	Name() string
 }
 
@@ -81,12 +87,12 @@ type tagProperty struct {
 	baseProperty
 }
 
-func (p tagProperty) New(f fields) Property {
+func (p tagProperty) New(f RawProperty) UnknownProperty {
 	return tagProperty{
 		baseProperty{
-			name:         f.name,
-			value:        f.tag,
-			propertyType: propTypeToValueType(f.propertyType),
+			name:         f.Name,
+			value:        f.Tag,
+			propertyType: propTypeToValueType(f.Type),
 		},
 	}
 }
@@ -95,14 +101,14 @@ type BoolProperty struct {
 	baseProperty
 }
 
-func (o BoolProperty) New(f fields) Property {
-	value := f.tag
+func (o BoolProperty) New(f RawProperty) UnknownProperty {
+	value := f.Tag
 	if value == nil {
-		value = f.tag_data
+		value = f.TagData
 	}
 	return BoolProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Bool",
 			value:        value.(bool),
 		},
@@ -113,12 +119,12 @@ type TextProperty struct {
 	baseProperty
 }
 
-func (o TextProperty) New(f fields) Property {
+func (o TextProperty) New(f RawProperty) UnknownProperty {
 	return TextProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Text",
-			value:        f.tag.(map[string]any)["source_string"],
+			value:        f.Tag.(map[string]any)["source_string"],
 		},
 	}
 }
@@ -127,10 +133,10 @@ type EventProperty struct {
 	baseProperty
 }
 
-func (o EventProperty) New(f fields) Property {
+func (o EventProperty) New(f RawProperty) UnknownProperty {
 	return EventProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Event",
 			value:        nil,
 		},
@@ -141,10 +147,10 @@ type SoftObjectProperty struct {
 	baseProperty
 }
 
-func (o SoftObjectProperty) New(f fields) Property {
+func (o SoftObjectProperty) New(f RawProperty) UnknownProperty {
 	return SoftObjectProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "SoftObject",
 			value:        nil,
 		},
@@ -155,12 +161,12 @@ type ObjectProperty struct {
 	baseProperty
 }
 
-func (o ObjectProperty) New(f fields) Property {
+func (o ObjectProperty) New(f RawProperty) UnknownProperty {
 	return ObjectProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Object",
-			value:        references.NewReference(f.tag.(map[string]any)),
+			value:        references.NewReference(f.Tag.(map[string]any)),
 		},
 	}
 }
@@ -169,12 +175,12 @@ type SetProperty struct {
 	baseProperty
 }
 
-func (o SetProperty) New(f fields) Property {
-	innerType := f.tag_data.(string)
+func (o SetProperty) New(f RawProperty) UnknownProperty {
+	innerType := f.TagData.(string)
 	innerValueType := propTypeToValueType(innerType)
 	return SetProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Set",
 			value: map[string]any{
 				"inner_type": innerValueType,
@@ -188,11 +194,11 @@ type ArrayProperty struct {
 	baseProperty
 }
 
-func (o ArrayProperty) New(f fields) Property {
-	innerType := f.tag_data.(string)
+func (o ArrayProperty) New(f RawProperty) UnknownProperty {
+	innerType := f.TagData.(string)
 	propertyType := typeFromStrType(innerType)
 	isInnerTypeStruct := isStructProperty(propertyType)
-	values := f.tag.([]any)
+	values := f.Tag.([]any)
 	out := make([]any, len(values))
 	for i, v := range values {
 		var tag_data any = nil
@@ -209,17 +215,17 @@ func (o ArrayProperty) New(f fields) Property {
 	}
 	return ArrayProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Array",
 			value:        value,
 		},
 	}
 }
 
-func makeAnonymousProperty(propertyType Property, tag, tag_data any) Property {
-	return propertyType.New(fields{
-		tag:      tag,
-		tag_data: tag_data,
+func makeAnonymousProperty(propertyType UnknownProperty, tag, tag_data any) UnknownProperty {
+	return propertyType.New(RawProperty{
+		Tag:     tag,
+		TagData: tag_data,
 	})
 }
 
@@ -234,17 +240,17 @@ type StructProperty struct {
 	baseProperty
 }
 
-func (o StructProperty) New(f fields) Property {
-	properties := structValueToPropertyMaps(f.tag)
+func (o StructProperty) New(f RawProperty) UnknownProperty {
+	properties := structValueToPropertyMaps(f.Tag)
 
 	structType := ""
-	if f.tag_data != nil {
-		structType = f.tag_data.(map[string]any)["type"].(string)
+	if f.TagData != nil {
+		structType = f.TagData.(map[string]any)["type"].(string)
 	}
 
 	return StructProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Struct",
 			value: map[string]any{
 				"struct_type": structType,
@@ -254,7 +260,7 @@ func (o StructProperty) New(f fields) Property {
 	}
 }
 
-func isStructProperty(p Property) bool {
+func isStructProperty(p UnknownProperty) bool {
 	_, ok := p.(StructProperty)
 	return ok
 }
@@ -263,8 +269,8 @@ type MapProperty struct {
 	baseProperty
 }
 
-func (o MapProperty) New(f fields) Property {
-	tag_data := f.tag_data.(map[string]any)
+func (o MapProperty) New(f RawProperty) UnknownProperty {
+	tag_data := f.TagData.(map[string]any)
 
 	keyPropertyTypeStr := tag_data["key_type"].(string)
 	valuePropertyTypeStr := tag_data["value_type"].(string)
@@ -275,11 +281,11 @@ func (o MapProperty) New(f fields) Property {
 
 	var values []any
 
-	if f.tag == nil {
+	if f.Tag == nil {
 		goto skip // The value of a map can be nil. In that case, completely skip the value handling
 	}
 
-	values = f.tag.([]any)
+	values = f.Tag.([]any)
 	for _, v := range values {
 		vMap := v.(map[string]any)
 
@@ -304,14 +310,14 @@ skip:
 
 	return MapProperty{
 		baseProperty{
-			name:         f.name,
+			name:         f.Name,
 			propertyType: "Map",
 			value:        value,
 		},
 	}
 }
 
-func propertyTypeToPropertyValue(propertyType Property, value, tag_data any) any {
+func propertyTypeToPropertyValue(propertyType UnknownProperty, value, tag_data any) any {
 	property := makeAnonymousProperty(propertyType, value, tag_data)
 	return property.Value()
 }
@@ -338,7 +344,8 @@ func structValueToPropertyMaps(value any) []map[string]any {
 func mapArrayOfProperties(properties []any) []map[string]any {
 	r := make([]map[string]any, len(properties))
 	for i, p := range properties {
-		property := New(p.(map[string]any))
+		raw := jsonToRawProperty(p.(map[string]any))
+		property := newProperty(raw)
 		r[i] = ToMap(property)
 	}
 	return r
@@ -371,14 +378,13 @@ func structMapToPropertyMaps(m map[string]any) []map[string]any {
 	return r
 }
 
-func New(json map[string]any) Property {
-	values := fieldsFromUnknownMap(json)
-	propertyType := typeFromStrType(values.propertyType)
-	property := propertyType.New(values)
+func newProperty(raw RawProperty) UnknownProperty {
+	propertyType := typeFromStrType(raw.Type)
+	property := propertyType.New(raw)
 	return property
 }
 
-func ToMap(p Property) map[string]any {
+func ToMap(p UnknownProperty) map[string]any {
 	return makePropertyMap(
 		p.Name(),
 		p.Type(),
@@ -397,3 +403,18 @@ func makePropertyMap(name, type_ string, value any) map[string]any {
 func propTypeToValueType(s string) string {
 	return strings.TrimSuffix(s, "Property")
 }
+
+func resolve(p UnknownProperty) Property {
+	return Property{
+		p.Type(),
+		p.Name(),
+		p.Value(),
+	}
+}
+
+func DataToProperty(data RawProperty) Property {
+	p := newProperty(data)
+	return resolve(p)
+}
+
+//TODO break down the big functions in this file & merge the internal and exported functions, this is a mess

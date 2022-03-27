@@ -1,5 +1,7 @@
 package data
 
+import "TweakItDocs/internal/data/properties"
+
 type Record struct {
 	Filename string   `json:"filename"`
 	Exports  []Export `json:"exports"`
@@ -7,15 +9,8 @@ type Record struct {
 }
 
 type Export struct {
-	ObjectName string     `json:"object_name"`
-	Properties []Property `json:"properties"`
-}
-
-type Property struct {
-	Name    string `json:"name"`
-	Type    string `json:"property_type"`
-	Tag     any    `json:"tag"`
-	TagData any    `json:"tag_data"`
+	ObjectName string                `json:"object_name"`
+	Properties []properties.Property `json:"properties"`
 }
 
 type Import struct {
@@ -41,7 +36,7 @@ type rawExport struct {
 }
 
 type rawExportData struct {
-	Properties []Property `json:"properties"`
+	Properties []properties.RawProperty `json:"properties"`
 }
 
 type rawExportExport struct {

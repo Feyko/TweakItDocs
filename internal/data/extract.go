@@ -1,6 +1,7 @@
 package data
 
 import (
+	"TweakItDocs/internal/data/properties"
 	"encoding/json"
 	"fmt"
 )
@@ -50,6 +51,10 @@ func rawExportsToExportSlice(raw []rawExport) []Export {
 func rawExportToExport(raw rawExport) Export {
 	return Export{
 		ObjectName: raw.Export.ObjectName,
-		Properties: raw.Data.Properties,
+		Properties: rawPropertiesToPropertySlice(raw.Data.Properties),
 	}
+}
+
+func rawPropertiesToPropertySlice(raw []properties.RawProperty) []properties.Property {
+	return mapSlice(raw, properties.DataToProperty)
 }
