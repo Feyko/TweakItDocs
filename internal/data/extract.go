@@ -4,6 +4,7 @@ import (
 	"TweakItDocs/internal/data/properties"
 	"encoding/json"
 	"fmt"
+	"regexp"
 )
 
 func Extract(data []byte) ([]Record, error) {
@@ -11,8 +12,28 @@ func Extract(data []byte) ([]Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	return rawRecordsToRecordSlice(raw), nil
+	extracted := rawRecordsToRecordSlice(raw)
+	return filter(extracted), nil
 
+}
+
+func filter(data []Record) []Record {
+	r := make([]Record, 0, len(data))
+	for _, e := range r {
+		if isValidAssetFilename(e.Filename) {
+			r = append(r, e)
+		}
+	}
+	return r
+}
+
+func isValidAssetFilename(s string) bool {
+	//match, err := regexp.MatchString("^FactoryGame.*(Build|Desc|Recipe|Schematic)_.*$", s)
+	match, err := regexp.MatchString("^FactoryGame.*$", s)
+	if err != nil {
+		return false
+	}
+	return match
 }
 
 func extractRaw(data []byte) ([]rawRecord, error) {

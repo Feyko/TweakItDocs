@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 )
 
 var c int
@@ -43,13 +42,4 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not output the result to the file: %w", err)
 	}
-}
-
-func isValidAssetFilename(s string) bool {
-	//match, err := regexp.MatchString("^FactoryGame.*(Build|Desc|Recipe|Schematic)_.*$", s)
-	match, err := regexp.MatchString("^FactoryGame.*$", s)
-	if err != nil {
-		return false
-	}
-	return match
 }
