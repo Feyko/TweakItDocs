@@ -19,7 +19,7 @@ func Extract(data []byte) ([]Record, error) {
 
 func filter(data []Record) []Record {
 	r := make([]Record, 0, len(data))
-	for _, e := range r {
+	for _, e := range data {
 		if isValidAssetFilename(e.Filename) {
 			r = append(r, e)
 		}
