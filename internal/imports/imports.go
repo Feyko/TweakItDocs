@@ -1,18 +1,53 @@
 package imports
 
 import (
+	"TweakItDocs/internal/data"
 	"log"
 )
 
-type importValues struct {
-	ClassName    string `structs:"class_name"`
-	ClassPackage string `structs:"class_package"`
-	ObjectName   string `structs:"object_name"`
-	OuterIndex   int64  `structs:"outer_index"`
+type ImportValues struct {
+	data.Import
 
 	// Not from the pak, filled by some logic
-	Index   int    `structs:"index"`
-	Package string `structs:"package"`
+	Index   int    `json:"index,omitempty"`
+	Package string `json:"package,omitempty"`
+}
+
+type ResolvedRecord struct {
+	data.Record
+	DeepestPackage            data.Import
+	ImportsFromDeepestPackage []data.Import
+}
+
+func Filter(records []data.Record) []ResolvedRecord {
+	r := make([]ResolvedRecord, len(records))
+	for i, record := range records {
+		deepestPackage := findLastPackageImport(record.Imports)
+		importsFromDeepest := findImportsFromPackage(record.Imports, deepestPackage.ObjectName)
+		newRecord := ResolvedRecord{record, deepestPackage, importsFromDeepest}
+		r[i] = newRecord
+	}
+	return r
+}
+
+func findLastPackageImport(imports []data.Import) data.Import {
+	deepest := 0
+	for i, imp := range imports {
+		if imp.ClassName == "Package" && i > deepest {
+			deepest = i
+		}
+	}
+	return imports[deepest]
+}
+
+func findImportsFromPackage(imports []data.Import, packageName string) []data.Import {
+	r := make([]data.Import, 0, len(imports)/3)
+	for _, imp := range imports {
+		if imp.ClassPackage == packageName {
+			r = append(r, imp)
+		}
+	}
+	return r
 }
 
 func arrayIndexToPakStyleIndex(i int) int {
@@ -23,7 +58,7 @@ func pakStyleIndexToArrayIndex(i int) int {
 	return arrayIndexToPakStyleIndex(i) // Logic is actually the same
 }
 
-func fillPackagesOfImportValuesArray(imports []importValues) []importValues {
+func fillPackagesOfImportValuesArray(imports []ImportValues) []ImportValues {
 	for i, imp := range imports {
 		if imp.OuterIndex == 0 {
 			continue
@@ -33,13 +68,13 @@ func fillPackagesOfImportValuesArray(imports []importValues) []importValues {
 	return imports
 }
 
-func fillPackageOfImportValues(imp importValues, imports []importValues) importValues {
+func fillPackageOfImportValues(imp ImportValues, imports []ImportValues) ImportValues {
 	outerPackage := findPackageOfImport(imp, imports)
 	imp.Package = outerPackage.ObjectName
 	return imp
 }
 
-func findPackageOfImport(imp importValues, imports []importValues) importValues {
+func findPackageOfImport(imp ImportValues, imports []ImportValues) ImportValues {
 	index := imp.OuterIndex
 	next := imports[pakStyleIndexToArrayIndex(int(index))]
 	for next.OuterIndex != 0 {

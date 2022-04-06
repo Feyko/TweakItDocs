@@ -1,13 +1,40 @@
 let data = require('./data.json')
 let filtered = require("./filtered.json")
 
+
+let classExports = filtered.map(e => {
+    return e.exports.filter(el => {
+        return !el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")
+    })
+}).flat(2)
+let classesWithNewShit = classExports.filter(cla => {
+    return cla.properties.filter(p => {
+                let valid = true
+                    const names = ["Timelines","Animations", "SimpleConstructionScript", "WidgetTree", "bClassRequiresNativeTick", "Bindings", "DynamicBindingObjects", "UberGraphFunction", "InheritableComponentHandler"]
+                        names.forEach(s => {
+                        if (p.name === s) {
+                            valid = false
+                        }
+                })
+                return valid
+            }).length > 0
+})
 // let doubled = filtered.map(e => {
 //     return e.exports.map(el => {
-//         return el.properties.filter(p => {
-//             return p.type === "Array of Structs"
-//         })
+//         if (!el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")) {
+//             return el.properties.filter(p => {
+//                 let valid = true
+//                     const names = ["SimpleConstructionScript", "WidgetTree", "bClassRequiresNativeTick", "Bindings", "DynamicBindingObjects", "UberGraphFunction", "InheritableComponentHandler"]
+//                         names.forEach(s => {
+//                         if (p.name === s) {
+//                             valid = false
+//                         }
+//                 })
+//                 return valid
+//             })
+//         }
 //     })
-// }).flat(9999)
+// })
 // let doubled = filtered.filter(e => {
 //     return e.exports.filter(exp => {
 //         return exp.name.startsWith("Default__")

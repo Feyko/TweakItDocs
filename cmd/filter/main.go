@@ -2,6 +2,7 @@ package main
 
 import (
 	"TweakItDocs/internal/data"
+	"TweakItDocs/internal/imports"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -30,10 +31,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not decode the data: %w\n", err)
 	}
-	fmt.Print("Finished extraction")
+	fmt.Println("Finished extraction")
+	filtered := imports.Filter(extracted)
 
 	//marshalled, err := sjsonhelp.MarshalIndent(r, "", " ")
-	marshalled, err := json.Marshal(extracted)
+	marshalled, err := json.Marshal(filtered)
 	if err != nil {
 		log.Fatalf("Could not marshal json: %v", err)
 	}
