@@ -6,6 +6,7 @@ type Record struct {
 	Filename string   `json:"filename"`
 	Exports  []Export `json:"exports"`
 	Imports  []Import `json:"imports"`
+	//Raw      rawRecord `json:"raw"`
 }
 
 type Export struct {

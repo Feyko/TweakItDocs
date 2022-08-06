@@ -1,8 +1,9 @@
 package references
 
 type Reference struct {
-	Index      int
-	ObjectName string
+	Index        int64  `json:"index"`
+	ObjectName   string `json:"object_name"`
+	SerialOffset int64  `json:"serial_offset"`
 }
 
 func NewReference(jsonMap map[string]any) Reference {
@@ -11,7 +12,7 @@ func NewReference(jsonMap map[string]any) Reference {
 		objectName = jsonMap["reference"].(map[string]any)["object_name"].(string)
 	}
 	return Reference{
-		Index:      int(jsonMap["index"].(float64)),
+		Index:      int64(jsonMap["index"].(float64)),
 		ObjectName: objectName,
 	}
 }

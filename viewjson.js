@@ -1,7 +1,43 @@
-let data = require('./data.json')
-let filtered = require("./filtered.json")
+import * as JSONStream from "JSONStream"
+import * as fs from "fs"
+import es from "event-stream"
+
+import * as bson from "bson"
+
+import chain from 'stream-chain';
+import parser from 'stream-json';
+import streamValues from 'stream-json/streamers/StreamValues.js';
+
+const pipeline = chain.chain([
+    fs.createReadStream('data.json'),
+    parser.parser(),
+    streamValues.streamValues(),
+]);
+
+const promise = new Promise((resolve, reject) => {
+    pipeline.on("end", resolve)
+})
+
+let data = {}
+
+pipeline.on("data", newData => {
+    data = newData.value
+})
 
 
+await promise
+
+
+import one from "./one-proto.json" assert { type: "json" };
+import filtered from "./filtered.json" assert { type: "json" };
+
+// let nonnull = data.map(e => {
+//     return e.exports.filter(exp => {
+//         console.log(exp.export.class_index)
+//         return exp.export.class_index !== null
+//     })
+// })
+debugger
 let classExports = filtered.map(e => {
     return e.exports.filter(el => {
         return !el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")
@@ -18,6 +54,9 @@ let classesWithNewShit = classExports.filter(cla => {
                 })
                 return valid
             }).length > 0
+})
+let builds = filtered.filter(e => {
+    return e.filename.includes("Build_") && e.exports.length !== 7
 })
 // let doubled = filtered.map(e => {
 //     return e.exports.map(el => {

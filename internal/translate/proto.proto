@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package translate;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "./gen";
+
+message Data {
+  repeated Package packages = 1;
+}
+
+message Package {
+
+  message Record {
+    string file_name = 1;
+    int64 file_offset = 2;
+    int64 file_size = 3;
+    int64 uncompressed_size = 4;
+    int64 compression_method = 5;
+    int64 timestamp = 6;
+    int64 data_sha_1_hash = 7;
+    repeated google.protobuf.Value compression_blocks = 8;
+    bool is_encrypted = 9;
+    int64 compression_block_size = 10;
+  }
+
+  message Guid {
+    int64 a = 1;
+    int64 b = 2;
+    int64 c = 3;
+    int64 d = 4;
+  }
+
+  message Generation {
+    int64 export_count = 1;
+    int64 name_count = 2;
+  }
+
+  message Version {
+    int64 major = 1;
+    int64 minor = 2;
+    int64 patch = 3;
+    int64 change_list = 4;
+    string branch = 5;
+  }
+
+  message Name {
+    string name = 1;
+    int64 non_case_preserving_hash = 2;
+    int64 case_preserving_hash = 3;
+  }
+
+  message Reference {
+    string class_package = 1;
+    string class_name = 2;
+    int64 outer_index = 3;
+    string object_name = 4;
+    PackageIndex outer_package = 5;
+  }
+
+  message Index {
+    int64 index = 1;
+    oneof opt_reference {
+      Reference norm_reference = 2;
+      ExportInfo object_reference = 3;
+      google.protobuf.Value reference = 4;
+    }
+  }
+
+  message PackageIndex {
+    int64 index = 1;
+    optional Reference reference = 2;
+  }
+
+  message Import {
+    string class_package = 1;
+    string class_name = 2;
+    int64 outer_index = 3;
+    string object_name = 4;
+    PackageIndex outer_package = 5;
+  }
+
+  message ExportInfo {
+    Index class_index = 1;
+    Index super_index = 2;
+    Index template_index = 3;
+    Index outer_index = 4;
+    string object_name = 5;
+    int64 save = 6;
+    int64 serial_size = 7;
+    int64 serial_offset = 8;
+    bool forced_export = 9;
+    bool not_for_client = 10;
+    bool not_for_server = 11;
+    Guid package_guid = 12;
+    int64 package_flags = 13;
+    bool not_always_loaded_for_editor_game = 14;
+    bool is_asset = 15;
+    int64 first_export_dependency = 16;
+    bool serialization_before_serialization_dependencies = 17;
+    bool create_before_serialization_dependencies = 18;
+    bool serialization_before_create_dependencies = 19;
+    bool create_before_create_dependencies = 20;
+  }
+
+  message Summary {
+    Record record = 1;
+    int64 tag = 2;
+    int64 legacy_file_version = 3;
+    int64 legacy_ue_3_version = 4;
+    int64 file_version_ue_4 = 5;
+    int64 file_version_licensee_ue_4 = 6;
+    int64 total_header_size = 7;
+    string folder_name = 8;
+    int64 package_flags = 9;
+    int64 name_offset = 10;
+    int64 gatherable_text_data_count = 11;
+    int64 gatherable_text_data_offset = 12;
+    int64 export_offset = 13;
+    int64 import_offset = 14;
+    int64 depends_offset = 15;
+    int64 string_asset_references_count = 16;
+    int64 string_asset_references_offset = 17;
+    int64 searchable_names_offset = 18;
+    int64 thumbnail_table_offset = 19;
+    Guid guid = 20;
+    repeated Generation generations = 21;
+    Version saved_by_engine_version = 22;
+    Version compatible_with_engine_version = 23;
+    int64 compression_flags = 24;
+    repeated google.protobuf.Value compressed_chunks = 25;
+    int64 package_source = 26;
+    repeated google.protobuf.Value additional_packages_to_cook = 27;
+    int64 asset_registry_data_offset = 28;
+    int64 bulk_data_start_offset = 29;
+    int64 world_tile_info_data_offset = 30;
+    repeated google.protobuf.Value chunk_ids = 31;
+    int64 preload_dependency_count = 32;
+    int64 preload_dependency_offset = 33;
+    repeated Name names = 34;
+    repeated Import imports = 35;
+    repeated ExportInfo exports = 36;
+  }
+
+  message Property {
+    string name = 1;
+    string property_type = 2;
+    google.protobuf.Value tag_data = 3;
+    int64 size = 4;
+    int64 array_index = 5;
+    optional Guid property_guid = 6;
+    google.protobuf.Value tag = 7;
+  }
+
+  message Data {
+    repeated Property properties = 1;
+    google.protobuf.Value data = 2;
+  }
+
+  message Export {
+    ExportInfo export = 1;
+    Data data = 2;
+  }
+
+  Record export_record = 1;
+  Summary summary = 2;
+  repeated Export exports = 3;
+}

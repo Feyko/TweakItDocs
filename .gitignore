@@ -17,3 +17,7 @@
 /.idea
 *.json
 filtered.json.old
+
+node_modules/
+
+pnpm-lock.yaml

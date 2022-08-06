@@ -62,6 +62,7 @@ func rawRecordToRecord(raw rawRecord) Record {
 		Filename: raw.ExportRecord.FileName,
 		Exports:  rawExportsToExportSlice(raw.Exports),
 		Imports:  raw.Summary.Imports,
+		//Raw:      raw,
 	}
 }
 
