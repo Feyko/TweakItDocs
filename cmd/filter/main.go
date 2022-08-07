@@ -5,8 +5,10 @@ import (
 	"TweakItDocs/internal/imports"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 	"os"
+	"strings"
 )
 
 var c int
@@ -21,6 +23,8 @@ func main() {
 	//if err != nil {
 	//	log.Fatalf("Could not start CPU profiling: %v", err)
 	//}
+	//cleanData("data.json")
+	//return
 
 	content, err := os.ReadFile("data.json")
 	if err != nil {
@@ -43,5 +47,17 @@ func main() {
 	err = os.WriteFile("filtered.json", marshalled, 0664)
 	if err != nil {
 		log.Fatalf("Could not output the result to the file: %w", err)
+	}
+}
+
+func cleanData(filename string) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not read"))
+	}
+	data = []byte(strings.ReplaceAll(string(data), "\\u0000", ""))
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not write"))
 	}
 }

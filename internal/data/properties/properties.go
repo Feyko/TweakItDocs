@@ -1,7 +1,6 @@
 package properties
 
 import (
-	"TweakItDocs/internal/data/properties/references"
 	"log"
 	"strings"
 )
@@ -162,13 +161,20 @@ type ObjectProperty struct {
 }
 
 func (o ObjectProperty) New(f RawProperty) UnknownProperty {
+	v := f.Tag.(map[string]any)
 	return ObjectProperty{
 		baseProperty{
 			name:         f.Name,
 			propertyType: "Object",
-			value:        references.NewReference(f.Tag.(map[string]any)),
+			value:        Index{Index: int(v["index"].(float64)), Null: v["reference"] == nil},
 		},
 	}
+}
+
+// Redefining a simpler Index type here because properties depending on the real Index makes a cyclic dependency
+type Index struct {
+	Index int
+	Null  bool
 }
 
 type SetProperty struct {

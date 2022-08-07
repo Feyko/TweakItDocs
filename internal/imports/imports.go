@@ -14,12 +14,12 @@ type ImportValues struct {
 }
 
 type ResolvedRecord struct {
-	data.Record
+	data.Package
 	DeepestPackage            data.Import
 	ImportsFromDeepestPackage []data.Import
 }
 
-func Filter(records []data.Record) []ResolvedRecord {
+func Filter(records []data.Package) []ResolvedRecord {
 	r := make([]ResolvedRecord, len(records))
 	for i, record := range records {
 		deepestPackage := findLastPackageImport(record.Imports)

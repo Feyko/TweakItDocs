@@ -1,24 +1,65 @@
-let data = require('./data.json')
-let filtered = require("./filtered.json")
+import * as fs from "fs"
 
+import chain from 'stream-chain';
+import parser from 'stream-json';
+import streamValues from 'stream-json/streamers/StreamValues.js';
 
-let classExports = filtered.map(e => {
-    return e.exports.filter(el => {
-        return !el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")
-    })
-}).flat(2)
-let classesWithNewShit = classExports.filter(cla => {
-    return cla.properties.filter(p => {
-                let valid = true
-                    const names = ["Timelines","Animations", "SimpleConstructionScript", "WidgetTree", "bClassRequiresNativeTick", "Bindings", "DynamicBindingObjects", "UberGraphFunction", "InheritableComponentHandler"]
-                        names.forEach(s => {
-                        if (p.name === s) {
-                            valid = false
-                        }
-                })
-                return valid
-            }).length > 0
+const pipeline = chain.chain([
+    fs.createReadStream('data-build.json'),
+    parser.parser(),
+    streamValues.streamValues(),
+]);
+
+const promise = new Promise((resolve, reject) => {
+    pipeline.on("end", resolve)
 })
+
+let data_build = {}
+
+pipeline.on("data", newData => {
+    data_build = newData.value
+})
+
+await promise
+
+import data from "./data-build.json" assert { type: "json" };
+import one from "./one-pretty.json" assert { type: "json" };
+import filtered from "./filtered.json" assert { type: "json" };
+
+// let build = data.filter(e => {
+//     return e.export_record.file_name.includes("Build_")
+// })
+// fs.writeFileSync("data-build.json", JSON.stringify(build))
+
+// let conveyors = data.filter(e => {
+//     return e.export_record.file_name.toLowerCase().includes("conveyor")
+// })
+//
+// let classProps = conveyors.filter(e => {
+//     return e.exports[0].data.properties.length > 0
+// })
+
+debugger
+// let classExports = filtered.map(e => {
+//     return e.exports.filter(el => {
+//         return !el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")
+//     })
+// }).flat(2)
+// let classesWithNewShit = classExports.filter(cla => {
+//     return cla.properties.filter(p => {
+//                 let valid = true
+//                     const names = ["Timelines","Animations", "SimpleConstructionScript", "WidgetTree", "bClassRequiresNativeTick", "Bindings", "DynamicBindingObjects", "UberGraphFunction", "InheritableComponentHandler"]
+//                         names.forEach(s => {
+//                         if (p.name === s) {
+//                             valid = false
+//                         }
+//                 })
+//                 return valid
+//             }).length > 0
+// })
+// let builds = filtered.filter(e => {
+//     return e.filename.includes("Build_") && e.exports.length !== 7
+// })
 // let doubled = filtered.map(e => {
 //     return e.exports.map(el => {
 //         if (!el.object_name.startsWith("Default__") && el.object_name.endsWith("_C")) {

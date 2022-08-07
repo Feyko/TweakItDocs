@@ -5,20 +5,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 )
 
-func Extract(data []byte) ([]Record, error) {
+func Extract(data []byte) ([]Package, error) {
+	debug.SetMaxStack(1 << 38) // No, it's not an infinite loop.. I'm just using a lot of stack. Sorry Go
+
 	raw, err := extractRaw(data)
 	if err != nil {
 		return nil, err
 	}
 	extracted := rawRecordsToRecordSlice(raw)
-	return filter(extracted), nil
-
+	extracted = filter(extracted)
+	resolve(extracted)
+	return extracted, nil
 }
 
-func filter(data []Record) []Record {
-	r := make([]Record, 0, len(data))
+func resolve(packages []Package) {
+	for _, p := range packages {
+		p.Resolve()
+	}
+}
+
+func filter(data []Package) []Package {
+	r := make([]Package, 0, len(data))
 	for _, e := range data {
 		if isValidAssetFilename(e.Filename) {
 			r = append(r, e)
@@ -45,7 +55,7 @@ func extractRaw(data []byte) ([]rawRecord, error) {
 	return out, nil
 }
 
-func rawRecordsToRecordSlice(raw []rawRecord) []Record {
+func rawRecordsToRecordSlice(raw []rawRecord) []Package {
 	return mapSlice(raw, rawRecordToRecord)
 }
 
@@ -57,8 +67,8 @@ func mapSlice[T any, R any](s []T, f func(T) R) []R {
 	return out
 }
 
-func rawRecordToRecord(raw rawRecord) Record {
-	return Record{
+func rawRecordToRecord(raw rawRecord) Package {
+	return Package{
 		Filename: raw.ExportRecord.FileName,
 		Exports:  rawExportsToExportSlice(raw.Exports),
 		Imports:  raw.Summary.Imports,
@@ -71,8 +81,12 @@ func rawExportsToExportSlice(raw []rawExport) []Export {
 
 func rawExportToExport(raw rawExport) Export {
 	return Export{
-		ObjectName: raw.Export.ObjectName,
-		Properties: rawPropertiesToPropertySlice(raw.Data.Properties),
+		ClassIndex:    raw.Export.ClassIndex.Convert(),
+		SuperIndex:    raw.Export.SuperIndex.Convert(),
+		TemplateIndex: raw.Export.TemplateIndex.Convert(),
+		OuterIndex:    raw.Export.OuterIndex.Convert(),
+		ObjectName:    raw.Export.ObjectName,
+		Properties:    rawPropertiesToPropertySlice(raw.Data.Properties),
 	}
 }
 
