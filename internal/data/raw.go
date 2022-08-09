@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"golang.org/x/exp/slices"
 	"strconv"
+	"strings"
 )
 
 func newStack() IndexStack {
@@ -50,6 +51,10 @@ func (p *Package) Resolve() {
 	}
 }
 
+func (p *Package) ClassPath(className string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(p.Filename, "uexp"), "uasset") + className
+}
+
 type Export struct {
 	ClassIndex    Index                 `json:"class_index"`
 	SuperIndex    Index                 `json:"super_index"`
@@ -90,10 +95,17 @@ func (e *Import) Resolve(p *Package) {
 	e.OuterPackage.Resolve(p)
 }
 
+func (e *Import) Path() string {
+	if e.OuterPackage.Null {
+		return ""
+	}
+	return e.OuterPackage.GetImport().ObjectName + "." + e.ObjectName
+}
+
 type Index struct {
 	Index     int
 	Null      bool
-	Reference any
+	Reference Reference
 }
 
 type Reference interface {
@@ -122,16 +134,31 @@ func (i *Index) UnmarshalJSON(bytes []byte) error {
 	return err
 }
 
-func (i Index) MarshalJSON() ([]byte, error) {
+func (i *Index) MarshalJSON() ([]byte, error) {
 	return []byte(strconv.FormatInt(int64(i.Index), 10)), nil
 }
 
-func (i Index) GetImport() *Import {
+func (i *Index) IsImport() bool {
+	return !i.Null && i.Index < 0
+}
+
+func (i *Index) GetImport() *Import {
 	return i.Reference.(*Import)
 }
 
-func (i Index) GetExport() *Import {
+func (i *Index) IsExport() bool {
+	return !i.Null && i.Index >= 0
+}
+
+func (i *Index) GetExport() *Import {
 	return i.Reference.(*Import)
+}
+
+func (i *Index) Path() string {
+	if i.IsExport() {
+		return i.GetExport().Path()
+	}
+	return i.GetImport().Path()
 }
 
 func indexFromPartialIndex(i properties.Index) *Index {
