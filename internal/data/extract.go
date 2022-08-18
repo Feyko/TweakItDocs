@@ -8,25 +8,31 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/pkg/errors"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 )
 
 var validFilenameRegexp = `^FactoryGame.*/(Build|Desc|Recipe|Schematic)_.*$`
-var validFilenameRegexpCompiled = regexp.MustCompile(`^FactoryGame.*/(Build|Desc|Recipe|Schematic)_.*$`)
 
-func ExtractSplit(dir string) ([]Package, error) {
+const clean = false
+
+//var validFilenameRegexpCompiled = regexp.MustCompile(`^FactoryGame.*/(Build|Desc|Recipe|Schematic)_.*$`)
+var validFilenameRegexpCompiled = regexp.MustCompile(`.`)
+
+func ExtractAllFromDir(dir string) ([]Asset, error) {
 	extractor := newSplitExtractor(dir)
 	return extractor.Extract()
 }
 
 type splitExtractor struct {
 	rootDir        string
-	packages       []Package
+	packages       []Asset
 	pool           *workerpool.WorkerPool
-	out            chan *Package
+	out            chan *Asset
 	outEvent       chan struct{}
 	doneEvent      chan struct{}
 	stoppedEvent   chan struct{}
@@ -39,9 +45,9 @@ type splitExtractor struct {
 func newSplitExtractor(path string) splitExtractor {
 	e := splitExtractor{
 		rootDir:      path,
-		packages:     make([]Package, 0, 25000),
+		packages:     make([]Asset, 0, 25000),
 		pool:         workerpool.New(runtime.NumCPU() * 2),
-		out:          make(chan *Package),
+		out:          make(chan *Asset),
 		doneEvent:    make(chan struct{}),
 		stoppedEvent: make(chan struct{}),
 		errored:      make(chan error),
@@ -51,7 +57,7 @@ func newSplitExtractor(path string) splitExtractor {
 	return e
 }
 
-func (e *splitExtractor) Extract() ([]Package, error) {
+func (e *splitExtractor) Extract() ([]Asset, error) {
 	e.startReceiver()
 	err := e.startExtractionTasks()
 	if err != nil {
@@ -87,8 +93,11 @@ func (e *splitExtractor) startExtractionTasks() error {
 	return nil
 }
 
-func extractionTask(path string, errored chan error, out chan *Package) func() {
+func extractionTask(path string, errored chan error, out chan *Asset) func() {
 	return func() {
+		if clean {
+			cleanData(path)
+		}
 		b, err := os.ReadFile(path)
 		if err != nil {
 			errored <- errors.Wrap(err, "could not read file")
@@ -117,18 +126,7 @@ func (e *splitExtractor) startReceiver() {
 	}()
 }
 
-func ExtractAll(data []byte) ([]Package, error) {
-	raw, err := extractAllRaw(data)
-	if err != nil {
-		return nil, err
-	}
-	extracted := rawRecordsToRecordSlice(raw)
-	extracted = FilterForFilename(extracted, validFilenameRegexp)
-	resolve(extracted)
-	return extracted, nil
-}
-
-func ExtractOne(data []byte) (*Package, error) {
+func ExtractOne(data []byte) (*Asset, error) {
 	raw, err := extractOneRaw(data)
 	if err != nil {
 		return nil, err
@@ -145,14 +143,8 @@ func isValidFilename(filename string) bool {
 	return validFilenameRegexpCompiled.MatchString(filename)
 }
 
-func resolve(packages []Package) {
-	for _, p := range packages {
-		p.Resolve()
-	}
-}
-
-func FilterForFilename(data []Package, match string) []Package {
-	r := make([]Package, 0, len(data))
+func FilterForFilename(data []Asset, match string) []Asset {
+	r := make([]Asset, 0, len(data))
 	reg := regexp.MustCompile(match)
 	for _, e := range data {
 		if reg.MatchString(e.Filename) {
@@ -160,15 +152,6 @@ func FilterForFilename(data []Package, match string) []Package {
 		}
 	}
 	return r
-}
-
-func extractAllRaw(data []byte) ([]rawRecord, error) {
-	var out []rawRecord
-	err := json.Unmarshal(data, &out)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal the json: %w", err)
-	}
-	return out, nil
 }
 
 func extractOneRaw(data []byte) (rawRecord, error) {
@@ -180,10 +163,6 @@ func extractOneRaw(data []byte) (rawRecord, error) {
 	return out, nil
 }
 
-func rawRecordsToRecordSlice(raw []rawRecord) []Package {
-	return mapSlice(raw, rawRecordToRecord)
-}
-
 func mapSlice[T any, R any](s []T, f func(T) R) []R {
 	out := make([]R, len(s))
 	for i, elem := range s {
@@ -192,8 +171,8 @@ func mapSlice[T any, R any](s []T, f func(T) R) []R {
 	return out
 }
 
-func rawRecordToRecord(raw rawRecord) Package {
-	return Package{
+func rawRecordToRecord(raw rawRecord) Asset {
+	return Asset{
 		Filename: raw.ExportRecord.FileName,
 		Exports:  rawExportsToExportSlice(raw.Exports),
 		Imports:  raw.Summary.Imports,
@@ -217,4 +196,16 @@ func rawExportToExport(raw rawExport) Export {
 
 func rawPropertiesToPropertySlice(raw []properties.RawProperty) []properties.Property {
 	return mapSlice(raw, properties.DataToProperty)
+}
+
+func cleanData(filename string) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not read"))
+	}
+	data = []byte(strings.ReplaceAll(string(data), "\\u0000", ""))
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not write"))
+	}
 }

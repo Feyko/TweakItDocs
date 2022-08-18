@@ -2,7 +2,7 @@ package data
 
 import "github.com/pkg/errors"
 
-func TranslateAll(packages []Package) ([]Data, error) {
+func TranslateAll(packages []Asset) ([]Data, error) {
 	r := make([]Data, len(packages))
 	for i, pkg := range packages {
 		data, err := TranslateOne(pkg)
@@ -14,7 +14,7 @@ func TranslateAll(packages []Package) ([]Data, error) {
 	return r, nil
 }
 
-func TranslateOne(pkg Package) (Data, error) {
+func TranslateOne(pkg Asset) (Data, error) {
 	data := Data{}
 	for _, export := range pkg.Exports {
 		if !export.SuperIndex.Null {

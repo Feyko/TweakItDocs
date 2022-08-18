@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var result []Package
+var result []Asset
 
 func BenchmarkExtract(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -25,7 +25,7 @@ func BenchmarkExtract(b *testing.B) {
 
 func BenchmarkExtractParallel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		r, err := ExtractSplit("data")
+		r, err := ExtractAllFromDir("data")
 		if err != nil {
 			log.Fatal(err)
 		}
